@@ -1,11 +1,10 @@
 import discord
 from discord.ext import commands
 import yt_dlp
-from youtube_search import YoutubeSearch
+from youtubesearchpython import VideosSearch
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 from async_timeout import timeout
-from functools import partial
 import asyncio
 
 intents = discord.Intents.default()
@@ -49,7 +48,7 @@ class MusicPlayer:
 
             if not self.loop:
                 try:
-                    async with timeout(300):  # wait 5 minutes for next song
+                    async with timeout(300):  # wait 5 minutes for the next song
                         self.current = await self.queue.get()
                 except asyncio.TimeoutError:
                     await self.voice_client.disconnect()
@@ -117,12 +116,13 @@ class Music(commands.Cog):
         await ctx.send(f"Added **{source['title']}** to the queue.")
 
     async def search_youtube(self, query):
-        results = YoutubeSearch(query, max_results=1).to_dict()
+        search = VideosSearch(query, limit=1)
+        results = search.result()['result']
         video_info = results[0]
 
         ydl_opts = {'format': 'bestaudio', 'noplaylist': 'True'}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"https://www.youtube.com{video_info['url_suffix']}", download=False)
+            info = ydl.extract_info(f"https://www.youtube.com{video_info['link']}", download=False)
             return {'url': info['formats'][0]['url'], 'title': video_info['title']}
 
     async def search_spotify(self, query):
@@ -160,8 +160,11 @@ class Music(commands.Cog):
 
     @commands.command(name="volume", help="Adjusts the playback volume")
     async def volume(self, ctx, volume: int):
-        ctx.voice_client.source.volume = volume / 100
-        await ctx.send(f"Volume set to {volume}%")
+        if 0 <= volume <= 100:
+            ctx.voice_client.source.volume = volume / 100
+            await ctx.send(f"Volume set to {volume}%")
+        else:
+            await ctx.send("Volume must be between 0 and 100.")
 
     @commands.command(name="now", help="Shows the current song")
     async def now(self, ctx):
